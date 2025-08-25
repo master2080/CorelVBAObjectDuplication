@@ -3,7 +3,7 @@ Sub Duplicate()
     Dim vertical_gap_MM As Double
     Dim page_border_right_MM As Double
     Dim page_border_bottom_MM As Double
-	Dim maxObjectsBeforeBitmap As Double
+    Dim maxObjectsBeforeBitmap As Double
     ' =======================
     ' CONFIGURATION SECTION
     ' =======================
@@ -13,7 +13,7 @@ Sub Duplicate()
     page_border_right_MM = 13       ' Gap from right edge of page in mm
     page_border_top_MM = 20         ' Position in Y to move the element to before duplicating
     page_border_bottom_MM = 11      ' Gap from bottom edge of page in mm
-	maxObjectsBeforeBitmap = 100	' Past this amount turn the objects(other than the outline) into a bitmap
+    maxObjectsBeforeBitmap = 100    ' Past this amount turn the objects(other than the outline) into a bitmap
     ' =======================
     ' END CONFIGURATION
     ' =======================
@@ -22,8 +22,8 @@ Sub Duplicate()
     Dim pg As Page
     Dim sr As ShapeRange, srWithoutMagenta As New ShapeRange
     Dim grp As Shape
-	Dim shp As Shape, oc As Outline, col As Color
-	Dim bmp As Shape
+    Dim shp As Shape, oc As Outline, col As Color
+    Dim bmp As Shape
     Dim startX As Double, startY As Double
     Dim rightLimit As Double, bottomLimit As Double
     Dim gapH As Double, gapV As Double
@@ -31,41 +31,40 @@ Sub Duplicate()
     
     Set doc = ActiveDocument
     Set pg = doc.ActivePage
-	
-    Optimization = True
+    
     ' Get selection
     Set sr = ActiveSelectionRange
     If sr.Count = 0 Then
         MsgBox "Please select one or more objects first."
         Exit Sub
     End If
-		
-	If sr.Count > maxObjectsBeforeBitmap Then ' Too many objects, convert all of them to a bitmap
-		For Each shp In sr
-			Dim isMagenta As Boolean
-			isMagenta = False
-				If Not shp.Outline Is Nothing Then
-					If shp.Outline.Width > 0 Then
-						Set oc = shp.Outline
-						Set col = oc.Color
-						If col.Type = cdrColorCMYK Then
-							If col.CMYKCyan = 0 And col.CMYKMagenta = 100 And col.CMYKYellow = 0 And col.CMYKBlack = 0 Then
-								isMagenta = True
-							End If
-						End If
-					End If
-				End If
-			If Not isMagenta then
-				srWithoutMagenta.Add shp
-			End If
-		Next shp
-		
-		' Parameters: Image type, Dithered?, Transparent?, Resolution dpi, Anti aliasing type[cdrAntiAliasingType], Use color profile(icc?), AlwaysOverprintBlack, OverprintBlackLimit
-		Set bmp = srWithoutMagenta.ConvertToBitmapEx(cdrCMYKColorImage,False,True,600,cdrNoAntiAliasing,True,False,0)
-		srWithoutMagenta.Delete ' Delete the now obsolete elements that were converted into a bitmap
-		bmp.AddToSelection ' The selection will now contain the magenta outline + the bitmap
-		Set sr = ActiveSelectionRange ' Set it to the active selection again after these updates, should have magenta outline+bmp
-	End If
+        
+    If sr.Count > maxObjectsBeforeBitmap Then ' Too many objects, convert all of them to a bitmap
+        For Each shp In sr
+            Dim isMagenta As Boolean
+            isMagenta = False
+                If Not shp.Outline Is Nothing Then
+                    If shp.Outline.Width > 0 Then
+                        Set oc = shp.Outline
+                        Set col = oc.Color
+                        If col.Type = cdrColorCMYK Then
+                            If col.CMYKCyan = 0 And col.CMYKMagenta = 100 And col.CMYKYellow = 0 And col.CMYKBlack = 0 Then
+                                isMagenta = True
+                            End If
+                        End If
+                    End If
+                End If
+            If Not isMagenta Then
+                srWithoutMagenta.Add shp
+            End If
+        Next shp
+        
+        ' Parameters: Image type, Dithered?, Transparent?, Resolution dpi, Anti aliasing type[cdrAntiAliasingType], Use color profile(icc?), AlwaysOverprintBlack, OverprintBlackLimit
+        Set bmp = srWithoutMagenta.ConvertToBitmapEx(cdrCMYKColorImage, False, True, 600, cdrNoAntiAliasing, True, False, 0)
+        srWithoutMagenta.Delete ' Delete the now obsolete elements that were converted into a bitmap
+        bmp.AddToSelection ' The selection will now contain the magenta outline + the bitmap
+        Set sr = ActiveSelectionRange ' Set it to the active selection again after these updates, should have magenta outline+bmp
+    End If
     
     ' Temporarily group selection so we can treat it as one unit
     Set grp = sr.Group
@@ -178,10 +177,8 @@ Sub Duplicate()
     allGroup.AlignToPageCenter cdrAlignHCenter
     allGroup.BottomY = minBottomGap
     allGroup.Ungroup
-	
-	' Undo optimization + refresh the screen for changes
-	Optimization = False
-	ActiveWindow.Refresh 
+    
+    ' Undo optimization + refresh the screen for changes
     
 End Sub
 
@@ -218,6 +215,8 @@ Private Function CountFit(ByVal grp As Shape, ByVal pg As Page, _
     
     CountFit = cols * rows
 End Function
+
+
 
 
 
