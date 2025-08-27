@@ -1,30 +1,15 @@
-Sub Duplicate()
-    Dim horizontal_gap_MM As Double
-    Dim vertical_gap_MM As Double
-    Dim page_border_right_MM As Double
-    Dim page_border_bottom_MM As Double
-    Dim maxObjectsBeforeBitmap As Double
-    Dim marker_distance_X_MM As Double
-    Dim marker_distance_Y_MM As Double
-    Dim marker_size_MM As Double
-    Dim marker_count As Double
-    ' =======================
-    ' CONFIGURATION SECTION
-    ' =======================
-    horizontal_gap_MM = 5           ' Horizontal gap between items in mm
-    vertical_gap_MM = 5             ' Vertical gap between items in mm
-    page_border_left_MM = 13        ' Position in X to move the element to before duplicating
-    page_border_right_MM = 13       ' Gap from right edge of page in mm
-    page_border_top_MM = 20         ' Position in Y to move the element to before duplicating
-    page_border_bottom_MM = 11      ' Gap from bottom edge of page in mm
-    maxObjectsBeforeBitmap = 100    ' Past this amount turn the objects(other than the outline) into a bitmap
-    marker_distance_X_MM = 4        ' The distance away from the magenta contour
-    marker_distance_Y_MM = 4        ' where to start placing the OPOS markers
-    marker_size_MM = 3              ' Size of the OPOS marker in mm
-    marker_count = 4                ' Total amount of markers, has to be an even number 4 or greater
-    ' =======================
-    ' END CONFIGURATION
-    ' =======================
+Public Sub RunDuplicate( _
+    ByVal horizontal_gap_MM As Double, _
+    ByVal vertical_gap_MM As Double, _
+    ByVal page_border_left_MM As Double, _
+    ByVal page_border_right_MM As Double, _
+    ByVal page_border_top_MM As Double, _
+    ByVal page_border_bottom_MM As Double, _
+    ByVal maxObjectsBeforeBitmap As Double, _
+    ByVal marker_distance_X_MM As Double, _
+    ByVal marker_distance_Y_MM As Double, _
+    ByVal marker_size_MM As Double, _
+    ByVal marker_count As Double)
     
     Dim doc As Document
     Dim pg As Page
@@ -242,8 +227,13 @@ Sub Duplicate()
         rect.Delete
 
     End If
-    
 End Sub
+
+Public Sub Duplicate()
+    ' RunDuplicate 5, 5, 13, 13, 20, 11, 100, 4, 4, 3, 4
+    NaklForm.Show
+End Sub
+
 
 Private Function CountFit(ByVal grp As Shape, ByVal pg As Page, _
                         ByVal gapH As Double, ByVal gapV As Double, _
@@ -278,3 +268,6 @@ Private Function CountFit(ByVal grp As Shape, ByVal pg As Page, _
     
     CountFit = cols * rows
 End Function
+
+
+
