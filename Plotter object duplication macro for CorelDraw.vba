@@ -8,8 +8,7 @@ Public Sub RunDuplicate( _
     ByVal maxObjectsBeforeBitmap As Double, _
     ByVal marker_distance_X_MM As Double, _
     ByVal marker_distance_Y_MM As Double, _
-    ByVal marker_size_MM As Double, _
-    ByVal marker_count As Double)
+    ByVal marker_size_MM As Double)
     
     Dim doc As Document
     Dim pg As Page
@@ -22,19 +21,17 @@ Public Sub RunDuplicate( _
     Dim gapH As Double, gapV As Double
     Dim minRightGap As Double, minBottomGap As Double
     Dim marker_distance_X As Double, marker_distance_Y As Double, marker_size As Double
+    Dim markerAmountThreshold_CM As Double 
+    Dim markerAmountThreshold As Double
+    Dim marker_count As Double
     
     Set doc = ActiveDocument
     Set pg = doc.ActivePage
-    
-    If marker_count < 4 Then
-        MsgBox "Marker count should be 4 or more"
-        Exit Sub
-    End If
 
-    If Not marker_count Mod 2 = 0 Then
-        MsgBox "Marker amount should be even(4,6,8...)"
-        Exit Sub
-    End If
+    markerAmountThreshold_CM = 23 ' For every additional X cm of a page, add 2 more markers, with an always minimum of 4
+    markerAmountThreshold = doc.ToUnits(markerAmountThreshold_CM, cdrCentimeter)
+
+    marker_count = 2 + (2 * Int(pg.SizeHeight / markerAmountThreshold))
 
     ' Get selection
     Set sr = ActiveSelectionRange

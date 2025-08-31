@@ -24,9 +24,7 @@ Private Sub UserForm_Initialize()
     MarkerDistanceXValue.Text = "4"
     MarkerDistanceYValue.Text = "4"
     MarkerSizeValue.Text = "3"
-    MarkerCountValue.Text = "4"
 End Sub
-
 
 Private Sub CancelButton_Click()
     Unload Me
@@ -73,10 +71,6 @@ Private Sub OkButton_Click()
         MsgBox "Marker size must be a positive number."
         Exit Sub
     End If
-    If Not IsNumeric(MarkerCountValue.Text) Or Val(MarkerCountValue.Text) <= 0 Then
-        MsgBox "Marker count must be a positive number."
-        Exit Sub
-    End If
     
     If MarkerCountValue.Text < 4 Or MarkerCountValue.Text Mod 2 <> 0 Then
         MsgBox "Marker count must be an even number and  4 or greater."
@@ -93,8 +87,7 @@ Private Sub OkButton_Click()
         CDbl(MaxObjectsValue.Text), _
         CDbl(MarkerDistanceXValue.Text), _
         CDbl(MarkerDistanceYValue.Text), _
-        CDbl(MarkerSizeValue.Text), _
-        CDbl(MarkerCountValue.Text)
+        CDbl(MarkerSizeValue.Text)
     
     Unload Me
 End Sub
