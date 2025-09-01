@@ -234,7 +234,7 @@ Public Sub RunDuplicate( _
     Dim allGroup As Shape
     Set allGroup = ActiveSelection.Group
     allGroup.AlignToPageCenter cdrAlignHCenter
-    allGroup.BottomY = bottomLimit
+    allGroup.BottomY = bottomLimit - (marker_distance_Y + marker_size) ' The actual bottom limit from the entire thing, markers included
     allGroup.Ungroup
     
     ' Restore reference point
