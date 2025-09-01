@@ -17,28 +17,29 @@ Public Sub RunDuplicate( _
     Dim shp As Shape, oc As Outline, col As Color
     Dim bmp As Shape
     Dim startX As Double, startY As Double
-    Dim rightLimit As Double, bottomLimit As Double, page_border_left As Double, page_border_top As Double
+    Dim rightLimit As Double, bottomLimit As Double, leftLimit As Double, topLimit As Double
     Dim gapH As Double, gapV As Double
-    Dim minRightGap As Double, minBottomGap As Double
+    Dim minRightGap As Double
     Dim marker_distance_X As Double, marker_distance_Y As Double, marker_size As Double
-    Dim markerAmountThreshold_CM As Double 
+    Dim markerAmountThreshold_CM As Double
     Dim markerAmountThreshold As Double
     Dim marker_count As Double
+    Dim refPoint As cdrReferencePoint
     
     Set doc = ActiveDocument
     Set pg = doc.ActivePage
-
-    markerAmountThreshold_CM = 23 ' For every additional X cm of a page, add 2 more markers, with an always minimum of 4
-    markerAmountThreshold = doc.ToUnits(markerAmountThreshold_CM, cdrCentimeter)
-
-    marker_count = 2 + (2 * Int(pg.SizeHeight / markerAmountThreshold))
-
+    refPoint = doc.ReferencePoint ' Store current reference point for restoration later
     ' Get selection
     Set sr = ActiveSelectionRange
     If sr.Count = 0 Then
         MsgBox "Please select one or more objects first."
         Exit Sub
     End If
+
+    markerAmountThreshold_CM = 23 ' For every additional X cm of a page, add 2 more markers, with an always minimum of 4
+    markerAmountThreshold = doc.ToUnits(markerAmountThreshold_CM, cdrCentimeter)
+
+    marker_count = 2 + (2 * Int(pg.SizeHeight / markerAmountThreshold))
         
     If sr.Count > maxObjectsBeforeBitmap Then ' Too many objects, convert all of them(except the magenta outline) to a bitmap
         For Each shp In sr
@@ -74,25 +75,28 @@ Public Sub RunDuplicate( _
     gapH = doc.ToUnits(horizontal_gap_MM, cdrMillimeter)
     gapV = doc.ToUnits(vertical_gap_MM, cdrMillimeter)
     minRightGap = doc.ToUnits(page_border_right_MM, cdrMillimeter)
-    minBottomGap = doc.ToUnits(page_border_bottom_MM, cdrMillimeter)
-    page_border_left = doc.ToUnits(page_border_left_MM, cdrMillimeter)
-    page_border_top = doc.ToUnits(page_border_top_MM, cdrMillimeter)
+    bottomLimit = doc.ToUnits(page_border_bottom_MM, cdrMillimeter)
+    leftLimit = doc.ToUnits(page_border_left_MM, cdrMillimeter)
+    topLimit = doc.ToUnits(page_border_top_MM, cdrMillimeter)
     marker_distance_X = doc.ToUnits(marker_distance_X_MM, cdrMillimeter)
     marker_distance_Y = doc.ToUnits(marker_distance_Y_MM, cdrMillimeter)
     marker_size = doc.ToUnits(marker_size_MM, cdrMillimeter)
     
-    ' Page limits
-    rightLimit = pg.SizeWidth - minRightGap
-    bottomLimit = minBottomGap
+    ' Page limits(including markers, markers reduce the workable area)
+    leftLimit = leftLimit + marker_distance_X + marker_size
+    rightLimit = pg.SizeWidth - (minRightGap + marker_distance_X + marker_size)
+    topLimit = pg.TopY - (topLimit + marker_distance_Y + marker_size)
+    bottomLimit = bottomLimit + marker_distance_Y + marker_size
+    
     
     Dim count0 As Long, count90 As Long
     
     grp.RotationAngle = 0
-    count0 = CountFit(grp, pg, gapH, gapV, page_border_left, page_border_top, rightLimit, bottomLimit)
+    count0 = CountFit(pg, grp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
     
     ' Test with rotation 90
     grp.RotationAngle = 90
-    count90 = CountFit(grp, pg, gapH, gapV, page_border_left, page_border_top, rightLimit, bottomLimit)
+    count90 = CountFit(pg, grp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
     
     If count90 > count0 Then
         grp.RotationAngle = 90
@@ -101,8 +105,8 @@ Public Sub RunDuplicate( _
     End If
     
     ' Move element to a top left position based on requirements
-    grp.LeftX = page_border_left
-    grp.TopY = (pg.TopY - page_border_top)
+    grp.LeftX = leftLimit
+    grp.TopY = topLimit
     
     ' Starting position
     startX = grp.LeftX
@@ -175,13 +179,8 @@ Public Sub RunDuplicate( _
     ' Unselect whatever is selected
     doc.ClearSelection
     
-    ' Center everything on the page(group+ H center) and move it to the bottom of the page( minus the bottom gap), then ungroup
-    pg.Shapes.All.CreateSelection
-    Dim allGroup As Shape
-    Set allGroup = ActiveSelection.Group
-    allGroup.AlignToPageCenter cdrAlignHCenter
-    allGroup.BottomY = minBottomGap
-    allGroup.Ungroup
+    
+    doc.ReferencePoint = cdrCenter ' Set ref point to center for marker placement
     
     ' Add OPOS markers based on the magenta group specifically, if it exists
     If Not magentaGroup Is Nothing Then
@@ -191,7 +190,7 @@ Public Sub RunDuplicate( _
         Dim stepY As Double
         Dim coords As Collection
 
-        halfSize = marker_size / 2 ' SetPosition relies on the center point for movement
+        halfSize = marker_size / 2 ' SetPosition relies on the center point for placement, based on doc.ReferencePoint
         rows = marker_count / 2 ' Amount of markers vertically, i.e 8 means 4 rows of vertical markers(2 corners and 2 middle ones)
         xLeft = magentaGroup.LeftX - marker_distance_X - halfSize ' Center X position of the left column
         xRight = magentaGroup.RightX + marker_distance_X + halfSize ' Center X position of the right column
@@ -224,25 +223,38 @@ Public Sub RunDuplicate( _
         rect.Delete
 
     End If
+
+    ' Restore reference point
+    doc.ReferencePoint = refPoint
+
+    ' Center everything on the page(group+ H center) and move it to the bottom of the page( minus the bottom gap), then ungroup
+    pg.Shapes.All.CreateSelection
+    Dim allGroup As Shape
+    Set allGroup = ActiveSelection.Group
+    allGroup.AlignToPageCenter cdrAlignHCenter
+    allGroup.BottomY = bottomLimit
+    allGroup.Ungroup
+    
+
+    
 End Sub
 
 Public Sub Duplicate()
-    ' RunDuplicate 5, 5, 13, 13, 20, 11, 100, 4, 4, 3, 4
     NaklForm.Show
 End Sub
 
 
-Private Function CountFit(ByVal grp As Shape, ByVal pg As Page, _
+Private Function CountFit(ByVal pg As Page, ByVal grp As Shape, _
                         ByVal gapH As Double, ByVal gapV As Double, _
-                        ByVal page_border_left As Double, ByVal page_border_top As Double, _
+                        ByVal leftLimit As Double, ByVal topLimit As Double, _
                         ByVal rightLimit As Double, ByVal bottomLimit As Double) As Long
     Dim startX As Double, startY As Double
     Dim x As Double, y As Double
     Dim cols As Long, rows As Long
     
     ' Move to top-left starting position
-    grp.LeftX = page_border_left
-    grp.TopY = (pg.TopY - page_border_top)
+    grp.LeftX = leftLimit
+    grp.TopY = topLimit
     
     startX = grp.LeftX
     startY = grp.TopY
@@ -265,6 +277,3 @@ Private Function CountFit(ByVal grp As Shape, ByVal pg As Page, _
     
     CountFit = cols * rows
 End Function
-
-
-
