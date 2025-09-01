@@ -12,7 +12,8 @@ Public Sub RunDuplicate( _
     
     Dim doc As Document
     Dim pg As Page
-    Dim sr As ShapeRange, srWithoutMagenta As New ShapeRange
+    Dim sr As ShapeRange, newSr As New ShapeRange
+    Dim totalObjects As Long
     Dim grp As Shape
     Dim shp As Shape, oc As Outline, col As Color
     Dim bmp As Shape
@@ -25,46 +26,51 @@ Public Sub RunDuplicate( _
     Dim markerAmountThreshold As Double
     Dim marker_count As Double
     Dim refPoint As cdrReferencePoint
+    Dim i As Double
     
     Set doc = ActiveDocument
     Set pg = doc.ActivePage
     refPoint = doc.ReferencePoint ' Store current reference point for restoration later
     ' Get selection
     Set sr = ActiveSelectionRange
-    If sr.Count = 0 Then
-        MsgBox "Please select one or more objects first."
+    
+    If sr.Count < 2 Then
+        MsgBox "Please select two or more objects first."
         Exit Sub
     End If
 
     markerAmountThreshold_CM = 23 ' For every additional X cm of a page, add 2 more markers, with an always minimum of 4
     markerAmountThreshold = doc.ToUnits(markerAmountThreshold_CM, cdrCentimeter)
-
     marker_count = 2 + (2 * Int(pg.SizeHeight / markerAmountThreshold))
+    
+    totalObjects = CountShapes(sr)
+    
         
-    If sr.Count > maxObjectsBeforeBitmap Then ' Too many objects, convert all of them(except the magenta outline) to a bitmap
+    If totalObjects > maxObjectsBeforeBitmap Then ' Too many objects, convert all of them(except the magenta outline) to a bitmap
+        Set newSr = CreateShapeRange
+    
+        ' find the magenta object and add it to the new group(also exclude from current sr)
         For Each shp In sr
-            Dim isMagenta As Boolean
-            isMagenta = False
-                If Not shp.Outline Is Nothing Then
-                    If shp.Outline.Width > 0 Then
-                        Set oc = shp.Outline
-                        Set col = oc.Color
-                        If col.Type = cdrColorCMYK Then
-                            If col.CMYKCyan = 0 And col.CMYKMagenta = 100 And col.CMYKYellow = 0 And col.CMYKBlack = 0 Then
-                                isMagenta = True
-                            End If
+            If Not shp.Outline Is Nothing Then
+                If shp.Outline.Width > 0 Then
+                    Set col = shp.Outline.Color
+                    If col.Type = cdrColorCMYK Then
+                        If col.CMYKCyan = 0 And col.CMYKMagenta = 100 And col.CMYKYellow = 0 And col.CMYKBlack = 0 Then
+                            newSr.Add shp
+                            sr.Remove sr.IndexOf(shp)
+                            Exit For
                         End If
                     End If
                 End If
-            If Not isMagenta Then
-                srWithoutMagenta.Add shp
             End If
         Next shp
-        
+
+        ' turn sr into bitmap
         ' Parameters: Image type, Dithered?, Transparent?, Resolution dpi, Anti aliasing type[cdrAntiAliasingType], Use color profile(icc?), AlwaysOverprintBlack, OverprintBlackLimit
-        Set bmp = srWithoutMagenta.ConvertToBitmapEx(cdrCMYKColorImage, False, True, 600, cdrNoAntiAliasing, True, False, 0)
-        srWithoutMagenta.Delete ' Delete the now obsolete elements that were converted into a bitmap
-        bmp.AddToSelection ' The selection will now contain the magenta outline + the bitmap
+        Set bmp = sr.ConvertToBitmapEx(cdrCMYKColorImage, False, True, 600, cdrNoAntiAliasing, True, False, 0)
+        sr.Delete ' Delete the now obsolete elements that were converted into a bitmap
+        newSr.Add bmp
+        newSr.AddToSelection
         Set sr = ActiveSelectionRange ' Set it to the active selection again after these updates, should have magenta outline+bmp
     End If
     
@@ -157,7 +163,7 @@ Public Sub RunDuplicate( _
     
     ' Find all magenta elements + group them
     Dim magentaShapes As New ShapeRange
-    For Each shp In pg.Shapes
+    For Each shp In pg.shapes
         If Not shp.Outline Is Nothing Then
             If shp.Outline.Width > 0 Then
                 Dim c As Color
@@ -201,7 +207,6 @@ Public Sub RunDuplicate( _
 
         
         Set coords = New Collection
-        Dim i As Double
         For i = 0 To rows - 1
             Dim yPos As Double
             yPos = (magentaGroup.TopY + marker_distance_Y + halfSize) - (i * stepY)
@@ -224,18 +229,16 @@ Public Sub RunDuplicate( _
 
     End If
 
-    ' Restore reference point
-    doc.ReferencePoint = refPoint
-
     ' Center everything on the page(group+ H center) and move it to the bottom of the page( minus the bottom gap), then ungroup
-    pg.Shapes.All.CreateSelection
+    pg.shapes.All.CreateSelection
     Dim allGroup As Shape
     Set allGroup = ActiveSelection.Group
     allGroup.AlignToPageCenter cdrAlignHCenter
     allGroup.BottomY = bottomLimit
     allGroup.Ungroup
     
-
+    ' Restore reference point
+    doc.ReferencePoint = refPoint
     
 End Sub
 
@@ -276,4 +279,21 @@ Private Function CountFit(ByVal pg As Page, ByVal grp As Shape, _
     Loop
     
     CountFit = cols * rows
+End Function
+
+Function CountShapes(shapes As ShapeRange) As Long
+    Dim s As Shape
+    Dim total As Long
+    total = 0
+    
+    For Each s In shapes
+        If s.Type = cdrGroupShape Then
+            total = total + CountShapes(s.shapes.All)
+        Else
+            total = total + 1
+        End If
+    Next s
+    
+    CountShapes = total
+    
 End Function
