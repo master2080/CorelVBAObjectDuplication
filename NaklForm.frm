@@ -13,17 +13,10 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+
+
 Private Sub UserForm_Initialize()
-    HorizontalGapValue.Text = "5"
-    VerticalGapValue.Text = "5"
-    LeftBorderValue.Text = "13"
-    RightBorderValue.Text = "13"
-    TopBorderValue.Text = "20"
-    BottomBorderValue.Text = "11"
-    MaxObjectsValue.Text = "100"
-    MarkerDistanceXValue.Text = "4"
-    MarkerDistanceYValue.Text = "4"
-    MarkerSizeValue.Text = "3"
+    LoadButton_Click
 End Sub
 
 Private Sub CancelButton_Click()
@@ -71,11 +64,7 @@ Private Sub OkButton_Click()
         MsgBox "Marker size must be a positive number."
         Exit Sub
     End If
-    
-    If MarkerCountValue.Text < 4 Or MarkerCountValue.Text Mod 2 <> 0 Then
-        MsgBox "Marker count must be an even number and  4 or greater."
-        Exit Sub
-    End If
+       
     
     RunDuplicate _
         CDbl(HorizontalGapValue.Text), _
@@ -92,6 +81,33 @@ Private Sub OkButton_Click()
     Unload Me
 End Sub
 
+Private Sub LoadButton_Click()
+    ' load settings from the registry, if they exist
+    HorizontalGapValue.Text = GetSetting("CorelDrawMacros", "UI", "HorizontalGapValue", "5")
+    VerticalGapValue.Text = GetSetting("CorelDrawMacros", "UI", "VerticalGapValue", "5")
+    LeftBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "LeftBorderValue", "13")
+    RightBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "RightBorderValue", "13")
+    TopBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "TopBorderValue", "20")
+    BottomBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "BottomBorderValue", "11")
+    MaxObjectsValue.Text = GetSetting("CorelDrawMacros", "UI", "MaxObjectsValue", "100")
+    MarkerDistanceXValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceXValue", "4")
+    MarkerDistanceYValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceYValue", "4")
+    MarkerSizeValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerSizeValue", "3")
+End Sub
+
+Private Sub SaveButton_Click()
+    ' saving is done based on the form field's name
+    SaveSetting "CorelDrawMacros", "UI", "HorizontalGapValue", HorizontalGapValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "VerticalGapValue", VerticalGapValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "LeftBorderValue", LeftBorderValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "RightBorderValue", RightBorderValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "TopBorderValue", TopBorderValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "BottomBorderValue", BottomBorderValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "MaxObjectsValue", MaxObjectsValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "MarkerDistanceXValue", MarkerDistanceXValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "MarkerDistanceYValue", MarkerDistanceYValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "MarkerSizeValue", MarkerSizeValue.Text
+End Sub
 Private Sub UserForm_Click()
 
 End Sub
