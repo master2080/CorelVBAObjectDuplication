@@ -15,6 +15,7 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 
 
+
 Private Sub UserForm_Initialize()
     LoadButton_Click
 End Sub
@@ -64,7 +65,14 @@ Private Sub OkButton_Click()
         MsgBox "Marker size must be a positive number."
         Exit Sub
     End If
-       
+    If Not IsNumeric(GapSplitValue.Text) Or Val(GapSplitValue.Text) <= 0 Then
+        MsgBox "Marker size must be a positive number."
+        Exit Sub
+    End If
+    If Not IsNumeric(GapDistanceValue.Text) Or Val(GapDistanceValue.Text) <= 0 Then
+        MsgBox "Marker size must be a positive number."
+        Exit Sub
+    End If
     
     RunDuplicate _
         CDbl(HorizontalGapValue.Text), _
@@ -76,8 +84,11 @@ Private Sub OkButton_Click()
         CDbl(MaxObjectsValue.Text), _
         CDbl(MarkerDistanceXValue.Text), _
         CDbl(MarkerDistanceYValue.Text), _
-        CDbl(MarkerSizeValue.Text)
-    
+        CDbl(MarkerSizeValue.Text), _
+        CBool(IsSplitMode.Value), _
+        CDbl(GapSplitValue.Text), _
+        CDbl(GapDistanceValue.Text)
+
     Unload Me
 End Sub
 
@@ -93,6 +104,10 @@ Private Sub LoadButton_Click()
     MarkerDistanceXValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceXValue", "4")
     MarkerDistanceYValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceYValue", "4")
     MarkerSizeValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerSizeValue", "3")
+    IsSplitMode.Value = GetSetting("CorelDrawMacros", "UI", "IsSplitMode", "True")
+    GapSplitValue.Text = GetSetting("CorelDrawMacros", "UI", "GapSplitValue", "2.5")
+    GapDistanceValue.Text = GetSetting("CorelDrawMacros", "UI", "GapDistanceValue", "240")
+    
 End Sub
 
 Private Sub SaveButton_Click()
@@ -107,6 +122,10 @@ Private Sub SaveButton_Click()
     SaveSetting "CorelDrawMacros", "UI", "MarkerDistanceXValue", MarkerDistanceXValue.Text
     SaveSetting "CorelDrawMacros", "UI", "MarkerDistanceYValue", MarkerDistanceYValue.Text
     SaveSetting "CorelDrawMacros", "UI", "MarkerSizeValue", MarkerSizeValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "IsSplitMode", IsSplitMode.Value
+    SaveSetting "CorelDrawMacros", "UI", "GapSplitValue", GapSplitValue.Text
+    SaveSetting "CorelDrawMacros", "UI", "GapDistanceValue", GapDistanceValue.Text
+    
 End Sub
 Private Sub UserForm_Click()
 

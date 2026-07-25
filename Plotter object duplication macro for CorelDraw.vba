@@ -1,4 +1,4 @@
-Public Sub RunDuplicate( _
+ Public Sub RunDuplicate( _
     ByVal horizontal_gap_MM As Double, _
     ByVal vertical_gap_MM As Double, _
     ByVal page_border_left_MM As Double, _
@@ -8,8 +8,11 @@ Public Sub RunDuplicate( _
     ByVal maxObjectsBeforeBitmap As Double, _
     ByVal marker_distance_X_MM As Double, _
     ByVal marker_distance_Y_MM As Double, _
-    ByVal marker_size_MM As Double)
-    
+    ByVal marker_size_MM As Double, _
+    ByVal isSplitMode As Boolean, _
+    ByVal gap_split_MM As Double, _
+    ByVal gap_distance_MM As Double)
+   
     Dim doc As Document
     Dim pg As Page
     Dim sr As ShapeRange, newSr As New ShapeRange
@@ -20,147 +23,186 @@ Public Sub RunDuplicate( _
     Dim startX As Double, startY As Double
     Dim rightLimit As Double, bottomLimit As Double, leftLimit As Double, topLimit As Double
     Dim gapH As Double, gapV As Double
-    Dim minRightGap As Double
+    Dim gapSplit As Double, gapDistance As Double
+    Dim minRightGap As Double, bottomLimitOrigin As Double
     Dim marker_distance_X As Double, marker_distance_Y As Double, marker_size As Double
     Dim markerAmountThreshold_CM As Double
     Dim markerAmountThreshold As Double
     Dim marker_count As Double
     Dim refPoint As cdrReferencePoint
     Dim i As Double
-    
+    dim splitMode As Boolean ' Splitting the objects apart with a gap after every #mm 
+   
     Set doc = ActiveDocument
     Set pg = doc.ActivePage
     refPoint = doc.ReferencePoint ' Store current reference point for restoration later
     ' Get selection
     Set sr = ActiveSelectionRange
-    
+   
     If sr.Count < 2 Then
         MsgBox "Please select two or more objects first."
         Exit Sub
     End If
-
     markerAmountThreshold_CM = 23 ' For every additional X cm of a page, add 2 more markers, with an always minimum of 4
     markerAmountThreshold = doc.ToUnits(markerAmountThreshold_CM, cdrCentimeter)
     marker_count = 2 + (2 * Int(pg.SizeHeight / markerAmountThreshold))
-    
+   
     totalObjects = CountShapes(sr)
-    
-        
-    If totalObjects > maxObjectsBeforeBitmap Then ' Too many objects, convert all of them(except the magenta outline) to a bitmap
-        Set newSr = CreateShapeRange
-    
-        ' find the magenta object and add it to the new group(also exclude from current sr)
-        For Each shp In sr
-            If Not shp.Outline Is Nothing Then
-                If shp.Outline.Width > 0 Then
-                    Set col = shp.Outline.Color
-                    If col.Type = cdrColorCMYK Then
-                        If col.CMYKCyan = 0 And col.CMYKMagenta = 100 And col.CMYKYellow = 0 And col.CMYKBlack = 0 Then
-                            newSr.Add shp
-                            sr.Remove sr.IndexOf(shp)
-                            Exit For
-                        End If
+   
+    Dim magShp As Shape
+   
+    ' find the magenta object
+    For Each shp In sr
+        If Not shp.Outline Is Nothing Then
+            If shp.Outline.Width > 0 Then
+                Set col = shp.Outline.Color
+                If col.Type = cdrColorCMYK Then
+                    If col.CMYKCyan = 0 And col.CMYKMagenta = 100 And col.CMYKYellow = 0 And col.CMYKBlack = 0 Then
+                        Set magShp = shp
+                        Exit For
                     End If
                 End If
             End If
-        Next shp
-
+        End If
+    Next shp
+       
+    If totalObjects > maxObjectsBeforeBitmap Then ' Too many objects, convert all of them(except the magenta outline) to a bitmap
         ' turn sr into bitmap
+        Set newSr = CreateShapeRange
+        newSr.Add magShp
+        sr.Remove sr.IndexOf(magShp)
         ' Parameters: Image type, Dithered?, Transparent?, Resolution dpi, Anti aliasing type[cdrAntiAliasingType], Use color profile(icc?), AlwaysOverprintBlack, OverprintBlackLimit
         Set bmp = sr.ConvertToBitmapEx(cdrCMYKColorImage, False, True, 600, cdrNoAntiAliasing, True, False, 0)
         sr.Delete ' Delete the now obsolete elements that were converted into a bitmap
         newSr.Add bmp
         newSr.AddToSelection
-        Set sr = ActiveSelectionRange ' Set it to the active selection again after these updates, should have magenta outline+bmp
+        Set sr = newSr 
     End If
-    
+   
     ' Temporarily group selection so we can treat it as one unit
     Set grp = sr.Group
-    
+   
     ' Convert mm to doc units, prevents wrong units being used in code
     gapH = doc.ToUnits(horizontal_gap_MM, cdrMillimeter)
     gapV = doc.ToUnits(vertical_gap_MM, cdrMillimeter)
+    gapSplit = doc.ToUnits(gap_split_MM, cdrMillimeter) ' TODO: replace with form later
     minRightGap = doc.ToUnits(page_border_right_MM, cdrMillimeter)
-    bottomLimit = doc.ToUnits(page_border_bottom_MM, cdrMillimeter)
+    bottomLimitOrigin = doc.ToUnits(page_border_bottom_MM, cdrMillimeter)
     leftLimit = doc.ToUnits(page_border_left_MM, cdrMillimeter)
     topLimit = doc.ToUnits(page_border_top_MM, cdrMillimeter)
     marker_distance_X = doc.ToUnits(marker_distance_X_MM, cdrMillimeter)
     marker_distance_Y = doc.ToUnits(marker_distance_Y_MM, cdrMillimeter)
     marker_size = doc.ToUnits(marker_size_MM, cdrMillimeter)
-    
+    splitMode = True
+    gapDistance = doc.ToUnits(gap_distance_MM, cdrMillimeter)
+   
     ' Page limits(including markers, markers reduce the workable area)
     leftLimit = leftLimit + marker_distance_X + marker_size
     rightLimit = pg.SizeWidth - (minRightGap + marker_distance_X + marker_size)
     topLimit = pg.TopY - (topLimit + marker_distance_Y + marker_size)
-    bottomLimit = bottomLimit + marker_distance_Y + marker_size
-    
-    
-    Dim count0 As Long, count90 As Long
-    
-    grp.RotationAngle = 0
-    count0 = CountFit(pg, grp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
-    
-    ' Test with rotation 90
-    grp.RotationAngle = 90
-    count90 = CountFit(pg, grp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
-    
-    If count90 > count0 Then
-        grp.RotationAngle = 90
-    Else
-        grp.RotationAngle = 0
-    End If
-    
-    ' Move element to a top left position based on requirements
-    grp.LeftX = leftLimit
-    grp.TopY = topLimit
-    
+    bottomLimit = bottomLimitOrigin + marker_distance_Y + marker_size
+   
+    Dim magWidth As Double, magHeight As Double
+    Dim magOffsetX As Double, magOffsetY As Double
+
+    magWidth = magShp.SizeWidth
+    magHeight = magShp.SizeHeight
+    ' Will be used to move the object group to the right position as it needs to be based on the magenta, even if the graphic is larger
+    magOffsetX = Abs(magShp.LeftX - grp.LeftX)
+    magOffsetY = Abs(grp.TopY - magShp.TopY)
+
+    ' Move element to a top left position based on requirements and magenta outline
+    grp.LeftX = leftLimit - magOffsetX
+    grp.TopY = topLimit + magOffsetY
+   
     ' Starting position
     startX = grp.LeftX
     startY = grp.TopY
-    
+   
+    Dim count0 As Long, count90 As Long
+   
+    magShp.RotationAngle = 0
+    count0 = CountFit(magShp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
+   
+    ' Test with rotation 90
+    magShp.RotationAngle = 90
+    count90 = CountFit(magShp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
+   
+    If count90 > count0 Then
+        grp.RotationAngle = 90
+        magShp.RotationAngle = 90
+    Else
+        grp.RotationAngle = 0
+        magShp.RotationAngle = 0
+    End If
+   
     ' Duplicate horizontally
     Dim rowShapes As New ShapeRange
     rowShapes.Add grp
-    
+   
+   ' widths are always based on magenta rather than group
     Dim x As Double
-    x = startX + grp.SizeWidth + gapH
-    Do While (x + grp.SizeWidth) <= rightLimit
+    x = startX + magWidth + gapH
+    Do While (x + magWidth) <= rightLimit
         Dim newGrp As Shape
         Set newGrp = grp.Duplicate
         newGrp.LeftX = x
         newGrp.TopY = startY
         rowShapes.Add newGrp
-        x = x + grp.SizeWidth + gapH
+        x = x + magWidth + gapH
     Loop
-    
+   
     ' Group the row
     Dim rowGroup As Shape
     Set rowGroup = rowShapes.Group
-    
+   
     ' Duplicate vertically
     Dim currentY As Double
-    currentY = startY - rowGroup.SizeHeight - gapV
-    
+    currentY = startY - magHeight - gapV
+   
     Dim rowCopies As New ShapeRange
     rowCopies.Add rowGroup
-    
-    Do While (currentY - rowGroup.SizeHeight) >= bottomLimit
+   
+    Dim workingAreaMiddle As Double
+    workingAreaMiddle = (topLimit + bottomLimit) / 2
+    Dim proposedBottomY As Double, splitLineMin As Double, splitLineMax As Double
+
+    Do While (currentY - magHeight) >= bottomLimit
+        proposedBottomY = currentY - magHeight
+        ' if the row is going to overlap with the middle cutting line
+        If splitMode Then
+            ' the next approaching break point
+            nextSplitIndex = Int((currentY - bottomLimit) / gapDistance)
+            splitLine = bottomLimit + (nextSplitIndex * gapDistance)
+
+            splitLineMin = splitLine - gapBuffer
+            splitLineMax = splitLine + gapBuffer
+
+            If nextSplitIndex > 0 And currentY >= splitLineMin And proposedBottomY <= splitLineMax Then
+                ' move below the line(accounting for a gap) instead
+                currentY = currentY - gapSplit
+
+                ' check again for the main condition if there is room left to place anything else
+                If (currentY - magHeight) < bottomLimit Then
+                    Exit Do
+                End If
+            End If
+        End If
         Dim newRow As Shape
         Set newRow = rowGroup.Duplicate
         newRow.TopY = currentY
         newRow.LeftX = startX
         rowCopies.Add newRow
-        currentY = currentY - rowGroup.SizeHeight - gapV
+        currentY = currentY - magHeight - gapV
     Loop
-    
-    ' Ungroup all rows (including the first one)
 
+    ' Ungroup all rows (including the first one)
     For Each shp In rowCopies
         If shp.Type = cdrGroupShape Then
             shp.UngroupAll
         End If
     Next shp
-    
+   
     ' Find all magenta elements + group them
     Dim magentaShapes As New ShapeRange
     For Each shp In pg.shapes
@@ -176,18 +218,18 @@ Public Sub RunDuplicate( _
             End If
         End If
     Next shp
-    
+   
     Dim magentaGroup As Shape
     If magentaShapes.Count > 0 Then
         Set magentaGroup = magentaShapes.Group
     End If
-    
+   
     ' Unselect whatever is selected
     doc.ClearSelection
-    
-    
+   
+   
     doc.ReferencePoint = cdrCenter ' Set ref point to center for marker placement
-    
+   
     ' Add OPOS markers based on the magenta group specifically, if it exists
     If Not magentaGroup Is Nothing Then
         Dim halfSize As Double, rows As Double
@@ -195,17 +237,14 @@ Public Sub RunDuplicate( _
         Dim xLeft As Double, xRight As Double
         Dim stepY As Double
         Dim coords As Collection
-
         halfSize = marker_size / 2 ' SetPosition relies on the center point for placement, based on doc.ReferencePoint
         rows = marker_count / 2 ' Amount of markers vertically, i.e 8 means 4 rows of vertical markers(2 corners and 2 middle ones)
         xLeft = magentaGroup.LeftX - marker_distance_X - halfSize ' Center X position of the left column
         xRight = magentaGroup.RightX + marker_distance_X + halfSize ' Center X position of the right column
-
         ' Get total distance between markers(their centers), figure out where to place each marker(with an equal distance)
         stepY = (magentaGroup.TopY + marker_distance_Y + halfSize) - (magentaGroup.BottomY - marker_distance_Y - halfSize)
         stepY = stepY / (rows - 1)
-
-        
+       
         Set coords = New Collection
         For i = 0 To rows - 1
             Dim yPos As Double
@@ -213,71 +252,70 @@ Public Sub RunDuplicate( _
             coords.Add Array(xLeft, yPos)
             coords.Add Array(xRight, yPos)
         Next i
-        
+       
         ' Base rectangle used for all
         Set rect = pg.ActiveLayer.CreateRectangle2(0, 0, marker_size, marker_size) ' X, Y, Width, Height
         rect.Fill.UniformColor.CMYKAssign 0, 0, 0, 100
         rect.Outline.SetNoOutline
-
         For i = 1 To coords.Count
             Set dup = rect.Duplicate
             dup.SetPosition coords(i)(0), coords(i)(1)
         Next i
-
         ' Delete the base rectangle
         rect.Delete
-
     End If
-
     ' Center everything on the page(group+ H center) and move it to the bottom of the page( minus the bottom gap), then ungroup
     pg.shapes.All.CreateSelection
     Dim allGroup As Shape
     Set allGroup = ActiveSelection.Group
     allGroup.AlignToPageCenter cdrAlignHCenter
-    allGroup.BottomY = bottomLimit - (marker_distance_Y + marker_size) ' The actual bottom limit from the entire thing, markers included
+    allGroup.BottomY = bottomLimitOrigin - (marker_distance_Y + marker_size) ' The actual bottom limit from the entire thing, markers included
     allGroup.Ungroup
-    
+   
     ' Restore reference point
     doc.ReferencePoint = refPoint
-    
+   
 End Sub
-
 Public Sub Duplicate()
     NaklForm.Show
 End Sub
-
-
-Private Function CountFit(ByVal pg As Page, ByVal grp As Shape, _
+Private Function CountFit(ByVal shp As Shape, _
                         ByVal gapH As Double, ByVal gapV As Double, _
                         ByVal leftLimit As Double, ByVal topLimit As Double, _
                         ByVal rightLimit As Double, ByVal bottomLimit As Double) As Long
     Dim startX As Double, startY As Double
     Dim x As Double, y As Double
     Dim cols As Long, rows As Long
-    
+    dim origX As Double, origY As Double
+    origX = shp.LeftX
+    origY = shp.TopY
+   
     ' Move to top-left starting position
-    grp.LeftX = leftLimit
-    grp.TopY = topLimit
-    
-    startX = grp.LeftX
-    startY = grp.TopY
-    
+    shp.LeftX = leftLimit
+    shp.TopY = topLimit
+   
+    startX = shp.LeftX
+    startY = shp.TopY
+   
     ' How many fit horizontally?
     cols = 1
-    x = startX + grp.SizeWidth + gapH
-    Do While (x + grp.SizeWidth) <= rightLimit
+    x = startX + shp.SizeWidth + gapH
+    Do While (x + shp.SizeWidth) <= rightLimit
         cols = cols + 1
-        x = x + grp.SizeWidth + gapH
+        x = x + shp.SizeWidth + gapH
     Loop
-    
+   
     ' How many fit vertically?
     rows = 1
-    y = startY - grp.SizeHeight - gapV
-    Do While (y - grp.SizeHeight) >= bottomLimit
+    y = startY - shp.SizeHeight - gapV
+    Do While (y - shp.SizeHeight) >= bottomLimit
         rows = rows + 1
-        y = y - grp.SizeHeight - gapV
+        y = y - shp.SizeHeight - gapV
     Loop
     
+    shp.LeftX = origX
+    shp.TopY = origY
+
     CountFit = cols * rows
 End Function
 
@@ -285,7 +323,7 @@ Function CountShapes(shapes As ShapeRange) As Long
     Dim s As Shape
     Dim total As Long
     total = 0
-    
+   
     For Each s In shapes
         If s.Type = cdrGroupShape Then
             total = total + CountShapes(s.shapes.All)
@@ -293,7 +331,7 @@ Function CountShapes(shapes As ShapeRange) As Long
             total = total + 1
         End If
     Next s
-    
+   
     CountShapes = total
-    
-End Function
+   
+End Function 
