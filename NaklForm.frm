@@ -73,6 +73,7 @@ Private Sub OkButton_Click()
         MsgBox "Marker size must be a positive number."
         Exit Sub
     End If
+    Unload Me
     
     RunDuplicate _
         CDbl(HorizontalGapValue.Text), _
@@ -89,7 +90,7 @@ Private Sub OkButton_Click()
         CDbl(GapSplitValue.Text), _
         CDbl(GapDistanceValue.Text)
 
-    Unload Me
+    
 End Sub
 
 Private Sub LoadButton_Click()
@@ -105,7 +106,7 @@ Private Sub LoadButton_Click()
     MarkerDistanceYValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceYValue", "4")
     MarkerSizeValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerSizeValue", "3")
     IsSplitMode.Value = GetSetting("CorelDrawMacros", "UI", "IsSplitMode", "True")
-    GapSplitValue.Text = GetSetting("CorelDrawMacros", "UI", "GapSplitValue", "2.5")
+    GapSplitValue.Text = GetSetting("CorelDrawMacros", "UI", "GapSplitValue", "10")
     GapDistanceValue.Text = GetSetting("CorelDrawMacros", "UI", "GapDistanceValue", "240")
     
 End Sub

@@ -20,7 +20,6 @@
     Dim grp As Shape
     Dim shp As Shape, oc As Outline, col As Color
     Dim bmp As Shape
-    Dim startX As Double, startY As Double
     Dim rightLimit As Double, bottomLimit As Double, leftLimit As Double, topLimit As Double
     Dim gapH As Double, gapV As Double
     Dim gapSplit As Double, gapDistance As Double
@@ -85,7 +84,7 @@
     ' Convert mm to doc units, prevents wrong units being used in code
     gapH = doc.ToUnits(horizontal_gap_MM, cdrMillimeter)
     gapV = doc.ToUnits(vertical_gap_MM, cdrMillimeter)
-    gapSplit = doc.ToUnits(gap_split_MM, cdrMillimeter) ' TODO: replace with form later
+    gapSplit = doc.ToUnits(gap_split_MM, cdrMillimeter)
     minRightGap = doc.ToUnits(page_border_right_MM, cdrMillimeter)
     bottomLimitOrigin = doc.ToUnits(page_border_bottom_MM, cdrMillimeter)
     leftLimit = doc.ToUnits(page_border_left_MM, cdrMillimeter)
@@ -93,7 +92,7 @@
     marker_distance_X = doc.ToUnits(marker_distance_X_MM, cdrMillimeter)
     marker_distance_Y = doc.ToUnits(marker_distance_Y_MM, cdrMillimeter)
     marker_size = doc.ToUnits(marker_size_MM, cdrMillimeter)
-    splitMode = True
+    splitMode = IsSplitMode
     gapDistance = doc.ToUnits(gap_distance_MM, cdrMillimeter)
    
     ' Page limits(including markers, markers reduce the workable area)
@@ -111,98 +110,140 @@
     magOffsetX = Abs(magShp.LeftX - grp.LeftX)
     magOffsetY = Abs(grp.TopY - magShp.TopY)
 
-    ' Move element to a top left position based on requirements and magenta outline
+    ' Move element to the bottom left position based on requirements and magenta outline
     grp.LeftX = leftLimit - magOffsetX
-    grp.TopY = topLimit + magOffsetY
-   
-    ' Starting position
-    startX = grp.LeftX
-    startY = grp.TopY
-   
+    grp.BottomY = bottomLimit - magOffsetY
+      
+    Dim count0hz As Long, count0vr As Long, count90hz As Long, count90vr As Long
     Dim count0 As Long, count90 As Long
+    Dim horizontalCount As Long, verticalCount As Long
    
-    magShp.RotationAngle = 0
-    count0 = CountFit(magShp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
-   
-    ' Test with rotation 90
-    magShp.RotationAngle = 90
-    count90 = CountFit(magShp, gapH, gapV, leftLimit, topLimit, rightLimit, bottomLimit)
+    ' magShp.RotationAngle = 0
+    count0hz = CountFit(magShp.SizeWidth, gapV, leftLimit, rightLimit)
+    count0vr = CountFit(magShp.SizeHeight, gapH, topLimit, bottomLimit)
+    count0 = count0hz * count0vr
+    
+    ' Test with rotation 90 - swap widths and heights around
+    ' magShp.RotationAngle = 90
+    count90hz = CountFit(magShp.SizeHeight, gapV, leftLimit, rightLimit)
+    count90vr = CountFit(magShp.SizeWidth, gapH, topLimit, bottomLimit)
+    count90 = count90hz * count90vr
    
     If count90 > count0 Then
         grp.RotationAngle = 90
         magShp.RotationAngle = 90
+        ' recalculate the magenta offsets due to the new rotation
+        magWidth = magShp.SizeWidth
+        magHeight = magShp.SizeHeight
+        magOffsetX = Abs(magShp.LeftX - grp.LeftX)
+        magOffsetY = Abs(grp.TopY - magShp.TopY)
+        
+        horizontalCount = count90hz
+        verticalCount = count90vr
     Else
         grp.RotationAngle = 0
         magShp.RotationAngle = 0
+        horizontalCount = count0hz
+        verticalCount = count0vr
     End If
    
     ' Duplicate horizontally
     Dim rowShapes As New ShapeRange
     rowShapes.Add grp
    
-   ' widths are always based on magenta rather than group
-    Dim x As Double
-    x = startX + magWidth + gapH
-    Do While (x + magWidth) <= rightLimit
+    Dim nextX As Double
+    nextX = grp.LeftX + grp.SizeWidth + gapH
+
+    for X = 2 To horizontalCount
         Dim newGrp As Shape
         Set newGrp = grp.Duplicate
-        newGrp.LeftX = x
-        newGrp.TopY = startY
+
+        newGrp.LeftX = nextX
+        newGrp.BottomY = grp.BottomY
         rowShapes.Add newGrp
-        x = x + magWidth + gapH
-    Loop
-   
+
+        nextX = nextX + grp.SizeWidth + gapH
+    Next X 
+
     ' Group the row
     Dim rowGroup As Shape
     Set rowGroup = rowShapes.Group
-   
+
+    Dim newRow As Shape
+
     ' Duplicate vertically
-    Dim currentY As Double
-    currentY = startY - magHeight - gapV
-   
-    Dim rowCopies As New ShapeRange
-    rowCopies.Add rowGroup
-   
-    Dim workingAreaMiddle As Double
-    workingAreaMiddle = (topLimit + bottomLimit) / 2
-    Dim proposedBottomY As Double, splitLineMin As Double, splitLineMax As Double
+    If splitMode Then
+        ' Figure out how many fit within a split block, if splitting is set to true
+        Dim nextY As Double, numInBlock As Long, blockCount As Long
+        nextY = grp.bottomY + magHeight + gapV
+        numInBlock = CountFit(rowGroup.SizeHeight, gapV, 0, gapDistance)
+        ' Most of the time there is going to be spare room, shrink block size to fit new size
+        If (((rowGroup.SizeHeight + gapV) * numInBlock) - gapV) < gapDistance Then
+            gapDistance = ((rowGroup.SizeHeight + gapV) * numInBlock) - gapV
+        End If
+        blockCount = CountFit(gapDistance, gapSplit, bottomLimit, topLimit)
 
-    Do While (currentY - magHeight) >= bottomLimit
-        proposedBottomY = currentY - magHeight
-        ' if the row is going to overlap with the middle cutting line
-        If splitMode Then
-            ' the next approaching break point
-            nextSplitIndex = Int((currentY - bottomLimit) / gapDistance)
-            splitLine = bottomLimit + (nextSplitIndex * gapDistance)
+        Dim blockGroupItems As New ShapeRange
+        blockGroupItems.Add rowGroup
 
-            splitLineMin = splitLine - gapBuffer
-            splitLineMax = splitLine + gapBuffer
+        For X = 2 To numInBlock
+            Set newRow = rowGroup.Duplicate
 
-            If nextSplitIndex > 0 And currentY >= splitLineMin And proposedBottomY <= splitLineMax Then
-                ' move below the line(accounting for a gap) instead
-                currentY = currentY - gapSplit
+            newRow.BottomY = nextY
+            newRow.LeftX = grp.LeftX
 
-                ' check again for the main condition if there is room left to place anything else
-                If (currentY - magHeight) < bottomLimit Then
-                    Exit Do
-                End If
+            blockGroupItems.Add newRow
+
+            nextY = nextY + magHeight + gapV
+        Next X
+
+        Dim blockGroup As Shape
+        Set blockGroup = blockGroupItems.Group
+        Dim blocks As New ShapeRange
+        
+        blocks.Add blockGroup
+
+        nextY = blockGroup.bottomY + blockGroup.SizeHeight + gapSplit
+
+        For X = 2 To blockCount
+            Dim newBlock As Shape
+            Set newBlock = blockGroup.Duplicate
+
+            newBlock.bottomY = nextY
+            newBlock.LeftX = grp.LeftX
+
+            blocks.Add newBlock
+
+            nextY = nextY + blockGroup.SizeHeight + gapSplit
+        Next X
+
+        ' Ungroup everything
+        Blocks.UngroupAll
+        
+    Else 
+        ' fill out the entire working area
+        Dim rowCopies As New ShapeRange
+        rowCopies.Add rowGroup
+    
+        Dim currentY As Double
+        nextY = grp.bottomY + magHeight + gapV
+
+        Do While (nextY + magHeight) <= topLimit
+            Set newRow = rowGroup.Duplicate
+            newRow.BottomY = nextY
+            newRow.LeftX = grp.LeftX
+            rowCopies.Add newRow
+            nextY = nextY + magHeight + gapV
+        Loop
+
+        ' Ungroup all rows
+        For Each shp In rowCopies
+            If shp.Type = cdrGroupShape Then
+                shp.UngroupAll
             End If
-        End If
-        Dim newRow As Shape
-        Set newRow = rowGroup.Duplicate
-        newRow.TopY = currentY
-        newRow.LeftX = startX
-        rowCopies.Add newRow
-        currentY = currentY - magHeight - gapV
-    Loop
-
-    ' Ungroup all rows (including the first one)
-    For Each shp In rowCopies
-        If shp.Type = cdrGroupShape Then
-            shp.UngroupAll
-        End If
-    Next shp
-   
+        Next shp
+    End If
+           
     ' Find all magenta elements + group them
     Dim magentaShapes As New ShapeRange
     For Each shp In pg.shapes
@@ -279,44 +320,16 @@ End Sub
 Public Sub Duplicate()
     NaklForm.Show
 End Sub
-Private Function CountFit(ByVal shp As Shape, _
-                        ByVal gapH As Double, ByVal gapV As Double, _
-                        ByVal leftLimit As Double, ByVal topLimit As Double, _
-                        ByVal rightLimit As Double, ByVal bottomLimit As Double) As Long
-    Dim startX As Double, startY As Double
-    Dim x As Double, y As Double
-    Dim cols As Long, rows As Long
-    dim origX As Double, origY As Double
-    origX = shp.LeftX
-    origY = shp.TopY
-   
-    ' Move to top-left starting position
-    shp.LeftX = leftLimit
-    shp.TopY = topLimit
-   
-    startX = shp.LeftX
-    startY = shp.TopY
-   
-    ' How many fit horizontally?
-    cols = 1
-    x = startX + shp.SizeWidth + gapH
-    Do While (x + shp.SizeWidth) <= rightLimit
-        cols = cols + 1
-        x = x + shp.SizeWidth + gapH
-    Loop
-   
-    ' How many fit vertically?
-    rows = 1
-    y = startY - shp.SizeHeight - gapV
-    Do While (y - shp.SizeHeight) >= bottomLimit
-        rows = rows + 1
-        y = y - shp.SizeHeight - gapV
-    Loop
-    
-    shp.LeftX = origX
-    shp.TopY = origY
 
-    CountFit = cols * rows
+Private Function CountFit(ByVal size As Double, ByVal gap As Double, ByVal fromLimit As Double, ByVal toLimit As Double) As Long
+    Dim totalLength As Double
+    totalLength = Abs(toLimit - fromLimit)
+    If (size + gap) <= 0 Or totalLength < size Then
+        CountFit = 0
+        Exit Function
+    End If
+    ' return the truncated number
+    CountFit = Fix((totalLength + gap) / (size + gap))
 End Function
 
 Function CountShapes(shapes As ShapeRange) As Long
