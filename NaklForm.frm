@@ -17,7 +17,19 @@ Attribute VB_Exposed = False
 
 
 Private Sub UserForm_Initialize()
-    LoadButton_Click
+    HorizontalGapValue.Text = GetSetting("CorelDrawMacros", "UI", "HorizontalGapValue", "5")
+    VerticalGapValue.Text = GetSetting("CorelDrawMacros", "UI", "VerticalGapValue", "5")
+    LeftBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "LeftBorderValue", "13")
+    RightBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "RightBorderValue", "13")
+    TopBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "TopBorderValue", "20")
+    BottomBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "BottomBorderValue", "11")
+    MaxObjectsValue.Text = GetSetting("CorelDrawMacros", "UI", "MaxObjectsValue", "100")
+    MarkerDistanceXValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceXValue", "4")
+    MarkerDistanceYValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceYValue", "4")
+    MarkerSizeValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerSizeValue", "3")
+    IsSplitMode.Value = GetSetting("CorelDrawMacros", "UI", "IsSplitMode", "True")
+    GapSplitValue.Text = GetSetting("CorelDrawMacros", "UI", "GapSplitValue", "10")
+    GapDistanceValue.Text = GetSetting("CorelDrawMacros", "UI", "GapDistanceValue", "240")
 End Sub
 
 Private Sub CancelButton_Click()
@@ -93,21 +105,21 @@ Private Sub OkButton_Click()
     
 End Sub
 
-Private Sub LoadButton_Click()
-    ' load settings from the registry, if they exist
-    HorizontalGapValue.Text = GetSetting("CorelDrawMacros", "UI", "HorizontalGapValue", "5")
-    VerticalGapValue.Text = GetSetting("CorelDrawMacros", "UI", "VerticalGapValue", "5")
-    LeftBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "LeftBorderValue", "13")
-    RightBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "RightBorderValue", "13")
-    TopBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "TopBorderValue", "20")
-    BottomBorderValue.Text = GetSetting("CorelDrawMacros", "UI", "BottomBorderValue", "11")
-    MaxObjectsValue.Text = GetSetting("CorelDrawMacros", "UI", "MaxObjectsValue", "100")
-    MarkerDistanceXValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceXValue", "4")
-    MarkerDistanceYValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerDistanceYValue", "4")
-    MarkerSizeValue.Text = GetSetting("CorelDrawMacros", "UI", "MarkerSizeValue", "3")
-    IsSplitMode.Value = GetSetting("CorelDrawMacros", "UI", "IsSplitMode", "True")
-    GapSplitValue.Text = GetSetting("CorelDrawMacros", "UI", "GapSplitValue", "10")
-    GapDistanceValue.Text = GetSetting("CorelDrawMacros", "UI", "GapDistanceValue", "240")
+Private Sub ResetButton_Click()
+    ' reset values to original predefined ones
+    HorizontalGapValue.Text = "5"
+    VerticalGapValue.Text = "5"
+    LeftBorderValue.Text = "13"
+    RightBorderValue.Text = "13"
+    TopBorderValue.Text = "20"
+    BottomBorderValue.Text = "11"
+    MaxObjectsValue.Text = "100"
+    MarkerDistanceXValue.Text = "4"
+    MarkerDistanceYValue.Text = "4"
+    MarkerSizeValue.Text = "3"
+    IsSplitMode.Value = "True"
+    GapSplitValue.Text = "10"
+    GapDistanceValue.Text = "240"
     
 End Sub
 

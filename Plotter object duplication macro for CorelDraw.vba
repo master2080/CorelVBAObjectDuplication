@@ -9,7 +9,7 @@
     ByVal marker_distance_X_MM As Double, _
     ByVal marker_distance_Y_MM As Double, _
     ByVal marker_size_MM As Double, _
-    ByVal isSplitMode As Boolean, _
+    ByVal IsSplitMode As Boolean, _
     ByVal gap_split_MM As Double, _
     ByVal gap_distance_MM As Double)
    
@@ -30,7 +30,7 @@
     Dim marker_count As Double
     Dim refPoint As cdrReferencePoint
     Dim i As Double
-    dim splitMode As Boolean ' Splitting the objects apart with a gap after every #mm 
+    Dim splitMode As Boolean ' Splitting the objects apart with a gap after every #mm
    
     Set doc = ActiveDocument
     Set pg = doc.ActivePage
@@ -75,7 +75,7 @@
         sr.Delete ' Delete the now obsolete elements that were converted into a bitmap
         newSr.Add bmp
         newSr.AddToSelection
-        Set sr = newSr 
+        Set sr = newSr
     End If
    
     ' Temporarily group selection so we can treat it as one unit
@@ -119,14 +119,14 @@
     Dim horizontalCount As Long, verticalCount As Long
    
     ' magShp.RotationAngle = 0
-    count0hz = CountFit(magShp.SizeWidth, gapV, leftLimit, rightLimit)
-    count0vr = CountFit(magShp.SizeHeight, gapH, topLimit, bottomLimit)
+    count0hz = CountFit(magShp.SizeWidth, gapH, leftLimit, rightLimit)
+    count0vr = CountFit(magShp.SizeHeight, gapV, topLimit, bottomLimit)
     count0 = count0hz * count0vr
     
     ' Test with rotation 90 - swap widths and heights around
     ' magShp.RotationAngle = 90
-    count90hz = CountFit(magShp.SizeHeight, gapV, leftLimit, rightLimit)
-    count90vr = CountFit(magShp.SizeWidth, gapH, topLimit, bottomLimit)
+    count90hz = CountFit(magShp.SizeHeight, gapH, leftLimit, rightLimit)
+    count90vr = CountFit(magShp.SizeWidth, gapV, topLimit, bottomLimit)
     count90 = count90hz * count90vr
    
     If count90 > count0 Then
@@ -135,6 +135,11 @@
         ' recalculate the magenta offsets due to the new rotation
         magWidth = magShp.SizeWidth
         magHeight = magShp.SizeHeight
+        
+        ' place it back into bottom left
+        grp.LeftX = leftLimit - magOffsetX
+        grp.BottomY = bottomLimit - magOffsetY
+        
         magOffsetX = Abs(magShp.LeftX - grp.LeftX)
         magOffsetY = Abs(grp.TopY - magShp.TopY)
         
@@ -152,9 +157,9 @@
     rowShapes.Add grp
    
     Dim nextX As Double
-    nextX = grp.LeftX + grp.SizeWidth + gapH
+    nextX = grp.LeftX + magShp.SizeWidth + gapH
 
-    for X = 2 To horizontalCount
+    For x = 2 To horizontalCount
         Dim newGrp As Shape
         Set newGrp = grp.Duplicate
 
@@ -162,8 +167,8 @@
         newGrp.BottomY = grp.BottomY
         rowShapes.Add newGrp
 
-        nextX = nextX + grp.SizeWidth + gapH
-    Next X 
+        nextX = nextX + magShp.SizeWidth + gapH
+    Next x
 
     ' Group the row
     Dim rowGroup As Shape
@@ -175,7 +180,7 @@
     If splitMode Then
         ' Figure out how many fit within a split block, if splitting is set to true
         Dim nextY As Double, numInBlock As Long, blockCount As Long
-        nextY = grp.bottomY + magHeight + gapV
+        nextY = grp.BottomY + magShp.SizeHeight + gapV
         numInBlock = CountFit(rowGroup.SizeHeight, gapV, 0, gapDistance)
         ' Most of the time there is going to be spare room, shrink block size to fit new size
         If (((rowGroup.SizeHeight + gapV) * numInBlock) - gapV) < gapDistance Then
@@ -186,7 +191,7 @@
         Dim blockGroupItems As New ShapeRange
         blockGroupItems.Add rowGroup
 
-        For X = 2 To numInBlock
+        For x = 2 To numInBlock
             Set newRow = rowGroup.Duplicate
 
             newRow.BottomY = nextY
@@ -194,8 +199,8 @@
 
             blockGroupItems.Add newRow
 
-            nextY = nextY + magHeight + gapV
-        Next X
+            nextY = nextY + magShp.SizeHeight + gapV
+        Next x
 
         Dim blockGroup As Shape
         Set blockGroup = blockGroupItems.Group
@@ -203,30 +208,30 @@
         
         blocks.Add blockGroup
 
-        nextY = blockGroup.bottomY + blockGroup.SizeHeight + gapSplit
+        nextY = blockGroup.BottomY + blockGroup.SizeHeight + gapSplit
 
-        For X = 2 To blockCount
+        For x = 2 To blockCount
             Dim newBlock As Shape
             Set newBlock = blockGroup.Duplicate
 
-            newBlock.bottomY = nextY
+            newBlock.BottomY = nextY
             newBlock.LeftX = grp.LeftX
 
             blocks.Add newBlock
 
             nextY = nextY + blockGroup.SizeHeight + gapSplit
-        Next X
+        Next x
 
         ' Ungroup everything
-        Blocks.UngroupAll
+        blocks.UngroupAll
         
-    Else 
+    Else
         ' fill out the entire working area
         Dim rowCopies As New ShapeRange
         rowCopies.Add rowGroup
     
         Dim currentY As Double
-        nextY = grp.bottomY + magHeight + gapV
+        nextY = grp.BottomY + magHeight + gapV
 
         Do While (nextY + magHeight) <= topLimit
             Set newRow = rowGroup.Duplicate
@@ -239,7 +244,7 @@
         ' Ungroup all rows
         For Each shp In rowCopies
             If shp.Type = cdrGroupShape Then
-                shp.UngroupAll
+                shp.Ungroup
             End If
         Next shp
     End If
@@ -270,6 +275,9 @@
    
    
     doc.ReferencePoint = cdrCenter ' Set ref point to center for marker placement
+    pg.shapes.All.CreateSelection
+    Dim allSelection As Shape
+    Set allSelection = ActiveSelection
    
     ' Add OPOS markers based on the magenta group specifically, if it exists
     If Not magentaGroup Is Nothing Then
@@ -280,16 +288,16 @@
         Dim coords As Collection
         halfSize = marker_size / 2 ' SetPosition relies on the center point for placement, based on doc.ReferencePoint
         rows = marker_count / 2 ' Amount of markers vertically, i.e 8 means 4 rows of vertical markers(2 corners and 2 middle ones)
-        xLeft = magentaGroup.LeftX - marker_distance_X - halfSize ' Center X position of the left column
-        xRight = magentaGroup.RightX + marker_distance_X + halfSize ' Center X position of the right column
+        xLeft = allSelection.LeftX - marker_distance_X - halfSize ' Center X position of the left column
+        xRight = allSelection.RightX + marker_distance_X + halfSize ' Center X position of the right column
         ' Get total distance between markers(their centers), figure out where to place each marker(with an equal distance)
-        stepY = (magentaGroup.TopY + marker_distance_Y + halfSize) - (magentaGroup.BottomY - marker_distance_Y - halfSize)
+        stepY = (allSelection.TopY + marker_distance_Y + halfSize) - (allSelection.BottomY - marker_distance_Y - halfSize)
         stepY = stepY / (rows - 1)
        
         Set coords = New Collection
         For i = 0 To rows - 1
             Dim yPos As Double
-            yPos = (magentaGroup.TopY + marker_distance_Y + halfSize) - (i * stepY)
+            yPos = (allSelection.TopY + marker_distance_Y + halfSize) - (i * stepY)
             coords.Add Array(xLeft, yPos)
             coords.Add Array(xRight, yPos)
         Next i
@@ -347,4 +355,5 @@ Function CountShapes(shapes As ShapeRange) As Long
    
     CountShapes = total
    
-End Function 
+End Function
+
